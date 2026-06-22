@@ -72,6 +72,7 @@ active → active (on each session or loop tick)
 ├── progress.md          — session history, confidence ratings, next topic
 ├── loop-signal.json     — last session outcome (read + cleared by loop)
 ├── loop.log             — loop tick history
+├── notes/               — handwritten notes extracted via Claude vision
 └── tracks/
     └── {track-name}/
         ├── MISSION.md

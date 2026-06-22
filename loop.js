@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 // Learning loop heartbeat — invoked daily by cron.
-// Reads agent state, detects conditions, replans schedule,
-// sends macOS notification. Delegates complex reasoning to Claude
-// by spawning `claude` CLI with the loop skill.
+// Thin launcher only (see ADR-004): checks whether the agent is active,
+// then delegates all observe/detect/replan/notify reasoning to the loop
+// skill by spawning the `claude` CLI. No detection logic lives here.
 
 const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');

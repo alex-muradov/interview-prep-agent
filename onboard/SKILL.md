@@ -133,20 +133,17 @@ For each track cluster identified from positions:
 
 **Baseline output:**
 
-After all clusters are probed, save to `~/.claude/interview-prep-agent/exam-baseline.json`:
+After all clusters are probed, save to `~/.claude/interview-prep-agent/exam-baseline.json`. The cluster keys are **derived from the tracks identified in `tracks.json`** — never a fixed list. Use one entry per cluster you actually probed:
 ```json
 {
   "date": "YYYY-MM-DD",
   "clusters": {
-    "Python & LLM Engineering": { "level": "low|medium|high", "strengths": [], "gaps": [] },
-    "Agentic Frameworks & RAG": { "level": "low|medium|high", "strengths": [], "gaps": [] },
-    "AI Product Strategy": { "level": "low|medium|high", "strengths": [], "gaps": [] },
-    "Responsible AI & Evaluation": { "level": "low|medium|high", "strengths": [], "gaps": [] },
-    "Systems Design for TPMs": { "level": "low|medium|high", "strengths": [], "gaps": [] },
-    "Stakeholder Management": { "level": "low|medium|high", "strengths": [], "gaps": [] }
+    "[Cluster name derived from the user's tracks]": { "level": "low|medium|high", "strengths": [], "gaps": [] },
+    "[Next probed cluster]": { "level": "low|medium|high", "strengths": [], "gaps": [] }
   }
 }
 ```
+(For example, an AI-engineering target might yield clusters like "Python & LLM Engineering" or "RAG & Agentic Frameworks"; a data-analyst target would yield entirely different clusters. Always derive from the positions, never hardcode.)
 
 Announce completion:
 > "Exam complete. Here's what I found:
@@ -161,14 +158,16 @@ Update state: `onboarding_step: "analysing"`
 
 Score positions silently:
 
-1. **Note signal scoring:**
-   - `tooooop`, `TOP OF THE TOP`, `!!!` → tier 1
-   - `TOP`, `top`, `TOP!`, `+++` → tier 2
+1. **Note signal scoring** (per CONTEXT.md ubiquitous language):
+   - `tooooop`, `TOP OF THE TOP` → tier 1
+   - `TOP`, `top`, `+++` → tier 2
    - `VERY interesting`, `interesting` → tier 3
    - `+` → tier 4
    - no note or `---` → tier 5
 
-2. **Profile match scoring:** domain, seniority, skill overlap
+   Tiers map to: tier 1 = 1.0, tier 2 = 0.8, tier 3 = 0.6, tier 4 = 0.4, tier 5 = 0.2
+
+2. **Profile match scoring:** average of domain match (0–1), seniority match (0–1), and skill overlap % (0–1)
 
 3. **Combined score** = (note signal × 0.6) + (profile match × 0.4)
 
@@ -216,11 +215,17 @@ Ask:
 **If no:**
 > "When's a good time? (e.g. 'tomorrow at 3pm')"
 
-Create Calendar event via osascript:
+Resolve the target calendar once (ADR-002 — the user's default calendar, never a hardcoded name). If `calendar_name` is not yet in state, list the user's calendars and use the first writable one (typically the default), then save it:
+```bash
+osascript -e 'tell application "Calendar" to get name of calendars'
+```
+Save the chosen name to state as `calendar_name` and reuse it for all future events.
+
+Create Calendar event via osascript (substitute `[CALENDAR_NAME]` with `state.calendar_name`):
 ```bash
 osascript << 'EOF'
 tell application "Calendar"
-  tell calendar "Home"
+  tell calendar "[CALENDAR_NAME]"
     set sessionDate to (current date)
     set hours of sessionDate to [HOUR]
     set minutes of sessionDate to [MINUTE]
@@ -234,7 +239,7 @@ EOF
 
 Install learning loop cron (replaces simple notification cron):
 ```bash
-(crontab -l 2>/dev/null | grep -v "interview-prep-agent"; echo "0 9 * * * cd ~/.claude && node ~/.claude/interview-prep-agent/loop.js >> ~/.claude/interview-prep-agent/loop.log 2>&1") | crontab -
+(crontab -l 2>/dev/null | grep -v "interview-prep-agent"; echo "0 9 * * * cd ~/.claude && node ~/.claude/skills/interview-prep-agent/loop.js >> ~/.claude/interview-prep-agent/loop.log 2>&1") | crontab -
 ```
 
 Confirm:

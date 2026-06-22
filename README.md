@@ -52,11 +52,14 @@ All agent state lives in `~/.claude/interview-prep-agent/`:
 ~/.claude/interview-prep-agent/
 ├── state.json          — routing state (new/onboarding/active/updating)
 ├── profile.md          — extracted user background
+├── exam-baseline.json  — per-cluster baseline from intro exam
 ├── positions.json      — scored and tiered positions
 ├── tracks.json         — track definitions
 ├── curriculum.md       — master learning plan (week by week)
 ├── progress.md         — session history, confidence ratings, next topic
 ├── schedule.json       — upcoming sessions
+├── loop-signal.json    — last session outcome (read + cleared by loop)
+├── loop.log            — loop tick history
 ├── notes/              — handwritten notes extracted via Claude vision
 └── tracks/
     └── {track-name}/

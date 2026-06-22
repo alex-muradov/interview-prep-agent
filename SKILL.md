@@ -17,10 +17,17 @@ State schema:
 ```json
 {
   "status": "new|onboarding|active|updating",
+  "onboarding_step": "cv|positions|time|deadline|exam|analysing|curriculum|scheduling",
   "current_track": null,
   "next_session": null,
   "last_lesson": null,
-  "onboarding_step": "cv|positions|time|deadline|exam|analysing|curriculum|scheduling"
+  "position_source": null,
+  "weekly_hours": null,
+  "session_duration": null,
+  "sessions_per_week": null,
+  "deadline": null,
+  "urgency": "high|medium|low",
+  "calendar_name": null
 }
 ```
 
@@ -29,9 +36,10 @@ State schema:
 - `new` or file missing → run [ONBOARDING](./onboard/SKILL.md)
 - `onboarding` → resume onboarding from `onboarding_step` (including `exam` step)
 - `active` + args contain "update" → run [UPDATE](./update/SKILL.md)
-- `active` + args contain "loop" → run [LOOP](./loop/SKILL.md) (cron heartbeat)
 - `active` + no args → run [SESSION](./session/SKILL.md)
 - `updating` → resume update
+
+The [LOOP](./loop/SKILL.md) is the autonomous cron heartbeat. It is **not** routed through this orchestrator — `loop.js` invokes it directly (see ADR-004), so it has no `/interview-prep-agent` entry point.
 
 ## Principles
 

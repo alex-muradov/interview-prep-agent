@@ -76,22 +76,33 @@ session: [lesson id]
 
 ## Step 6 — Trigger loop replanning
 
-After recording confidence, immediately calculate spaced repetition schedule for this topic:
+After recording confidence, immediately calculate the spaced repetition schedule for this topic. Each rating produces **two** review intervals, measured from the lesson date (per CONTEXT.md):
 
-| Confidence | Next review |
-|---|---|
-| high | +7 days |
-| medium | +3 days |
-| low | next session |
+| Confidence | First review | Second review |
+|---|---|---|
+| high | +7 days | +21 days |
+| medium | +3 days | +10 days |
+| low | next session | +5 days |
 
-Insert review entry into `schedule.json`:
+Insert **both** review entries into `schedule.json` (`stage: 1` and `stage: 2`):
 ```json
 {
   "date": "[ISO date]",
   "type": "review",
+  "stage": 1,
   "topic": "[topic]",
   "track": "[track]",
-  "reason": "spaced repetition — [high/medium/low] confidence"
+  "reason": "spaced repetition (1st pass) — [high/medium/low] confidence"
+}
+```
+```json
+{
+  "date": "[ISO date]",
+  "type": "review",
+  "stage": 2,
+  "topic": "[topic]",
+  "track": "[track]",
+  "reason": "spaced repetition (2nd pass) — [high/medium/low] confidence"
 }
 ```
 
@@ -110,7 +121,7 @@ Then write loop replan signal to `~/.claude/interview-prep-agent/loop-signal.jso
 Read `schedule.json` for next planned session. If none:
 > "When's your next session? I'll add it to Calendar."
 
-Create Calendar event via osascript with 30-min alert.
+Create Calendar event via osascript with 30-min alert, targeting `state.calendar_name` (the user's default calendar resolved during onboarding — never a hardcoded calendar name, per ADR-002).
 
 ## Step 8 — Update state
 
