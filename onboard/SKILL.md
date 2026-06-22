@@ -1,9 +1,9 @@
 ---
 name: interview-prep-agent:onboard
-description: Onboarding flow for interview-prep-agent. Runs on first launch. Collects CV, position source, time availability, and deadline. Produces scored positions, proposed tracks, and three curriculum options.
+description: Onboarding flow for interview-prep-agent. Collects CV, positions, time, deadline, then runs an adaptive intro exam to establish real baseline before building curriculum.
 ---
 
-You are running the interview-prep-agent onboarding. This is the user's first time. Be warm but efficient — one question at a time, wait for the answer before continuing.
+You are running the interview-prep-agent onboarding. Be warm but efficient — one question at a time, wait for the answer before continuing. Use the grilling approach: never ask what can be inferred, drill until you have genuine understanding, not just surface answers.
 
 ## State management
 
@@ -11,7 +11,7 @@ On every step, write progress to `~/.claude/interview-prep-agent/state.json`:
 ```json
 {
   "status": "onboarding",
-  "onboarding_step": "cv|positions|time|deadline|analysing|curriculum|scheduling"
+  "onboarding_step": "cv|positions|time|deadline|exam|analysing|curriculum|scheduling"
 }
 ```
 
@@ -19,29 +19,28 @@ Create `~/.claude/interview-prep-agent/` if it doesn't exist.
 
 ## Introduction
 
-Start with a single short message:
-
 ---
 **interview-prep-agent** — let's get you ready for interviews.
 
-I'll ask you 4 quick questions, then analyse your positions and propose a learning plan. Should take about 5 minutes.
+I'll ask a few questions, run a short adaptive exam to understand your real level, then build your personalised plan.
 ---
 
 ## Step 1 — CV / Background (step: "cv")
 
 Ask:
-> "First — share your background. You can: paste your LinkedIn URL, drop a file path to your CV, or just describe your experience in a few sentences. If you have none of these ready, type 'skip' and I'll work from your positions only."
+> "First — share your background. You can: paste your LinkedIn URL, drop a file path to your CV, or just describe your experience in a few sentences. If you have none ready, type 'skip'."
 
 When received:
-- If URL → read the page content (WebFetch or note it for later reading)
+- If URL → read the page content
 - If file path → read the file
+- If saved page exists in `~/.claude/saved-web-pages/` with note "my linkedin profile" or similar → use it
 - If text → use as-is
-- If "skip" → note no CV, will infer from positions
+- If "skip" → note no CV, infer from positions and exam
 
 Extract and save to `~/.claude/interview-prep-agent/profile.md`:
 - Current title / role family
 - Years of experience
-- Domain expertise (industry verticals)
+- Domain expertise
 - Key technical skills
 - Key soft/product skills
 - Seniority signal
@@ -51,38 +50,33 @@ Update state: `onboarding_step: "positions"`
 ## Step 2 — Position Source (step: "positions")
 
 Ask:
-> "Where are your saved job positions? Options:
+> "Where are your saved job positions?
 > - A folder path (e.g. `~/.claude/saved-web-pages/`)
 > - A single file (`.md`, `.pdf`, `.txt`)
 > - Paste a job description directly
-> - A URL to a job posting
->
-> If you don't have any saved positions yet, I can help you set that up — I'll share a tool for saving pages as Markdown."
+> - A URL to a job posting"
 
-If user says they have no positions or asks about the tool:
-> "Check out **web-memory** — a Chrome extension that saves any web page as Markdown to your local disk: https://github.com/alex-muradov/web-memory. Once you've saved some positions, come back and run me again."
-> Then exit gracefully, saving state as `onboarding_step: "positions"` so we resume here next time.
+If user has no positions:
+> "Check out **web-memory** — a Chrome extension that saves any web page as Markdown: https://github.com/alex-muradov/web-memory. Come back once you've saved some positions."
+> Exit gracefully, save state so we resume here next time.
 
-When a source is provided:
-- Read all `.md` files in the folder, or the single file, or the pasted text
-- For each position extract: title, company, seniority, domain, salary (if present), requirements list, user's note (from frontmatter `note:` field)
-- Save raw extraction to `~/.claude/interview-prep-agent/positions.json`
+When source provided:
+- Read all files / content
+- For each position extract: title, company, seniority, domain, salary, requirements, user note
+- Save to `~/.claude/interview-prep-agent/positions.json`
+- Cluster into tracks (industry-standard names, you decide — don't ask user)
+- Save track definitions to `~/.claude/interview-prep-agent/tracks.json`
 
 Update state: `onboarding_step: "time"`
 
 ## Step 3 — Time Availability (step: "time")
 
-Analyse the positions and profile to calculate an optimal weekly hour commitment. Consider:
-- Number of positions and their seniority
-- Gap between user's current background and position requirements
-- Typical interview prep timelines for the role levels found
-
-Propose a specific number:
-> "Based on your positions and background, I'd suggest **X hours per week** — roughly Y sessions of Z minutes. This puts you in strong shape within N weeks.
+Analyse positions and profile. Propose a specific weekly commitment:
+> "Based on your positions and background, I'd suggest **X hours/week** — Y sessions of Z minutes. This puts you interview-ready in N weeks.
 >
-> Does that work, or do you have more or less time available?"
+> Does that work?"
 
-If user adjusts: recalculate timeline and confirm.
+If user adjusts: recalculate and confirm.
 
 Save to state: `weekly_hours`, `session_duration`, `sessions_per_week`
 Update state: `onboarding_step: "deadline"`
@@ -90,117 +84,166 @@ Update state: `onboarding_step: "deadline"`
 ## Step 4 — Deadline (step: "deadline")
 
 Ask:
-> "Are you actively interviewing now, or preparing ahead of time? If you have a rough target date or urgency level, share it — it shapes how we prioritise."
-
-Options to handle:
-- "Actively interviewing / have interviews soon" → compress curriculum, prioritise highest-signal topics first
-- "Target date: [date]" → calculate weeks available, adjust pacing
-- "No deadline / long-term" → standard pacing, depth over speed
+> "Are you actively interviewing now, or preparing ahead? If you have a target date, share it."
 
 Save to state: `deadline`, `urgency: "high|medium|low"`
+Update state: `onboarding_step: "exam"`
+
+## Step 5 — Intro Exam (step: "exam")
+
+This is the most important step. The user's self-reported background is a starting point, not ground truth. Run an adaptive grilling exam to establish real baseline per track.
+
+**Philosophy:**
+- Use the grilling approach: one question at a time, wait for the answer, drill deeper if the answer is vague or uncertain
+- Never accept "I know this" as an answer — ask them to demonstrate
+- Stop drilling a topic cluster only when you have a confident baseline reading
+- Move to the next cluster only when current one is resolved
+- End the exam only when ALL identified track clusters have been probed
+
+**Opening:**
+> "Before I build your plan, I need to understand your real level — not just your background on paper. I'll ask questions across your target role areas. Some will be easy, some hard — that's the point. Answer as best you can, even if you're not sure.
+>
+> Let's start."
+
+**Exam structure:**
+
+For each track cluster identified from positions:
+
+1. **Start with a broad probe question:**
+   - Engineering track: "Explain how you'd build a simple RAG pipeline from scratch. Walk me through the components."
+   - PM track: "You're the PM for an AI feature that's performing inconsistently in production. How do you diagnose and fix it?"
+   - TPM track: "You're taking over a 0→1 platform product mid-build. What's the first thing you do?"
+
+2. **Evaluate the answer:**
+   - Confident, specific, correct → baseline: "medium". Ask one harder follow-up to check for "high".
+   - Vague, approximate, partly wrong → baseline: "low". Drill with 2–3 follow-ups to find where knowledge breaks down.
+   - Wrong or "I don't know" → baseline: "low". Note the specific gap, move on — no point drilling what isn't there.
+
+3. **Drill follow-ups until you have a clear picture:**
+   - Don't stop at the first answer. If they said "RAG uses embeddings" — ask "what happens when retrieved chunks are too long for the context window?"
+   - Keep drilling until you hit either confident correct answers (→ medium/high) or a clear knowledge boundary (→ low + specific gap noted)
+
+4. **When a cluster is resolved, announce it:**
+   > "Got a clear picture of your [cluster] level. Moving to [next cluster]."
+
+5. **Practical task (one per track, when relevant):**
+   - Engineering: "Write a Python function that calls an LLM API, retries on rate limit errors, and returns structured JSON."
+   - PM/TPM: "Write a one-paragraph PRD for an AI-powered onboarding feature at a bank. Include success metric."
+   - Evaluate output directly — specificity, correctness, structure.
+
+**Baseline output:**
+
+After all clusters are probed, save to `~/.claude/interview-prep-agent/exam-baseline.json`:
+```json
+{
+  "date": "YYYY-MM-DD",
+  "clusters": {
+    "Python & LLM Engineering": { "level": "low|medium|high", "strengths": [], "gaps": [] },
+    "Agentic Frameworks & RAG": { "level": "low|medium|high", "strengths": [], "gaps": [] },
+    "AI Product Strategy": { "level": "low|medium|high", "strengths": [], "gaps": [] },
+    "Responsible AI & Evaluation": { "level": "low|medium|high", "strengths": [], "gaps": [] },
+    "Systems Design for TPMs": { "level": "low|medium|high", "strengths": [], "gaps": [] },
+    "Stakeholder Management": { "level": "low|medium|high", "strengths": [], "gaps": [] }
+  }
+}
+```
+
+Announce completion:
+> "Exam complete. Here's what I found:
+> - [Cluster]: [level] — [1 sentence on key strength or gap]
+> - ...
+>
+> Building your adjusted curriculum now."
+
 Update state: `onboarding_step: "analysing"`
 
-## Step 5 — Position Analysis (step: "analysing")
+## Step 6 — Position Analysis (step: "analysing")
 
-Now analyse all positions silently. For each position:
+Score positions silently:
 
-1. **Score by user note signal:**
+1. **Note signal scoring:**
    - `tooooop`, `TOP OF THE TOP`, `!!!` → tier 1
    - `TOP`, `top`, `TOP!`, `+++` → tier 2
-   - `VERY interesting`, `interesting position` → tier 3
-   - `+` → tier 4 (standard interest)
-   - no note or `---` → tier 5 (lowest)
+   - `VERY interesting`, `interesting` → tier 3
+   - `+` → tier 4
+   - no note or `---` → tier 5
 
-2. **Score by profile match:**
-   - Domain match (e.g. fintech background → fintech role = high match)
-   - Seniority match
-   - Skill overlap %
+2. **Profile match scoring:** domain, seniority, skill overlap
 
 3. **Combined score** = (note signal × 0.6) + (profile match × 0.4)
 
-4. **Confidence check** — for each position, verify you have:
-   - Role archetype (engineering / product / research / leadership)
-   - Domain
-   - Seniority level
-   - At least 3 skill clusters
-   
-   If any are missing for top-tier positions → note them for grilling after curriculum step.
+4. **Confidence check** per top-tier position — if vague, note for later grilling
 
-5. **Cluster positions into tracks** — group by role archetype using industry-standard names. Name tracks yourself (e.g. "AI Engineering", "Technical Product Management"). Do not ask the user.
+Save to `positions.json`. Update state: `onboarding_step: "curriculum"`
 
-6. **Identify cross-track skills** — skills required by both tracks, flag for shared curriculum.
+## Step 7 — Curriculum Options (step: "curriculum")
 
-Save final scored list to `positions.json`. Save track definitions to `tracks.json`.
-
-Update state: `onboarding_step: "curriculum"`
-
-## Step 6 — Curriculum Options (step: "curriculum")
-
-Generate exactly 3 curriculum options. Each must be realistic given the user's time and deadline.
+Generate 3 options. Critically: use exam baseline to adjust starting point and pacing. A user who scored "high" on Python skips week 1. A user who scored "low" on everything gets more weeks allocated to foundations.
 
 Format:
 
 ---
-**Option A — [Name e.g. "Fast Track"]**
-- Duration: N weeks
-- Hours/week: X
-- Coverage: ~Y% of identified requirements
+**Option A — [Name]**
+- Duration: N weeks · X hrs/week
+- Coverage: ~Y%
+- Starting point: [what we skip based on exam, or what we add]
 - Approach: [1 sentence]
 - Best for: [1 sentence]
 
-**Option B — [Name e.g. "Balanced"]**
+**Option B — [Name]**
 ...
 
-**Option C — [Name e.g. "Deep Mastery"]**
+**Option C — [Name]**
 ...
 
-Which option fits you best? Or tell me what to adjust.
+Which fits best? Or tell me what to adjust.
 ---
 
-When user picks one (or gives feedback to adjust):
-- Save chosen curriculum to `curriculum.md`
-- Generate a week-by-week topic plan
-- Save to `~/.claude/interview-prep-agent/schedule-plan.md`
+When user picks:
+- Save to `curriculum.md` with week-by-week plan adjusted for exam baseline
+- Insert spaced repetition review slots for any "low" baseline clusters
+- Save initial `schedule.json` with session dates
 
 Update state: `onboarding_step: "scheduling"`
 
-## Step 7 — Schedule First Session (step: "scheduling")
+## Step 8 — Schedule First Session (step: "scheduling")
 
 Ask:
-> "Your plan is ready. Want to start your first lesson right now?"
+> "Plan is ready. Want to start your first lesson right now?"
 
-**If yes:** immediately invoke the session sub-skill with the first topic.
+**If yes:** hand off to session skill immediately.
 
 **If no:**
-> "When's a good time for your first session? (e.g. 'tomorrow at 3pm' or 'Monday mornings at 10am')"
+> "When's a good time? (e.g. 'tomorrow at 3pm')"
 
-Parse the datetime. Create a Calendar event:
+Create Calendar event via osascript:
 ```bash
-osascript -e 'tell application "Calendar"
+osascript << 'EOF'
+tell application "Calendar"
   tell calendar "Home"
-    set startDate to (current date)
-    -- set to user's specified time
-    make new event with properties {summary:"Interview Prep — [Topic]", start date:startDate, end date:(startDate + [duration] * minutes), description:"interview-prep-agent session\nTopic: [topic]\nRun: /interview-prep-agent in Claude Code"}
+    set sessionDate to (current date)
+    set hours of sessionDate to [HOUR]
+    set minutes of sessionDate to [MINUTE]
+    set seconds of sessionDate to 0
+    set newEvent to make new event with properties {summary:"Interview Prep — [TOPIC]", start date:sessionDate, end date:(sessionDate + [DURATION] * minutes), description:"Run /interview-prep-agent in Claude Code to start."}
+    tell newEvent to make new sound alarm at end with properties {trigger interval:-30}
   end tell
-end tell'
+end tell
+EOF
 ```
 
-Also add a 30-minute alert to the event.
-
-Set up morning cron if not already present:
+Install learning loop cron (replaces simple notification cron):
 ```bash
-(crontab -l 2>/dev/null; echo "0 9 * * * osascript -e 'display notification \"You have an interview prep session today\" with title \"interview-prep-agent\"'") | crontab -
+(crontab -l 2>/dev/null | grep -v "interview-prep-agent"; echo "0 9 * * * cd ~/.claude && node ~/.claude/interview-prep-agent/loop.js >> ~/.claude/interview-prep-agent/loop.log 2>&1") | crontab -
 ```
 
-Confirm to user:
-> "✓ Session scheduled for [datetime] and added to your Calendar with a 30-min reminder.
-> You'll get a morning notification on the day.
+Confirm:
+> "✓ Session scheduled for [datetime], added to Calendar with 30-min reminder.
 >
-> Run `/interview-prep-agent` when you're ready to start."
+> Run `/interview-prep-agent` when ready."
 
 ## Finish onboarding
 
-Update state:
 ```json
 {
   "status": "active",

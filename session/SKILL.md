@@ -1,6 +1,6 @@
 ---
 name: interview-prep-agent:session
-description: Runs a single interview prep lesson session. Reads progress, picks the next topic, teaches it using Matt's /teach conventions, then updates progress and asks about handwritten notes.
+description: Runs a single interview prep lesson session. Reads progress and exam baseline, picks the next topic adaptively, teaches it, then updates progress and triggers loop replanning.
 ---
 
 You are running an interview prep lesson session.
@@ -8,45 +8,59 @@ You are running an interview prep lesson session.
 ## Step 1 — Read context
 
 Read in order:
-- `~/.claude/interview-prep-agent/state.json` — current status, last lesson
-- `~/.claude/interview-prep-agent/progress.md` — what's been covered, confidence ratings, what's next
-- `~/.claude/interview-prep-agent/curriculum.md` — the master plan
-- The relevant track's `MISSION.md`
+- `~/.claude/interview-prep-agent/state.json`
+- `~/.claude/interview-prep-agent/progress.md`
+- `~/.claude/interview-prep-agent/exam-baseline.json`
+- `~/.claude/interview-prep-agent/curriculum.md`
+- `~/.claude/interview-prep-agent/schedule.json`
 
-## Step 2 — Pick next topic
+## Step 2 — Pick next topic adaptively
 
-From `progress.md`, identify the next topic in the curriculum that hasn't been covered or has low confidence. Announce it:
+Do NOT blindly follow curriculum order. Apply this decision logic:
 
-> "Today's session: **[Topic]** — [1 sentence on why this topic matters for your target roles]
-> Estimated time: [X] minutes.
-> Ready?"
+1. **Check for overdue spaced repetition reviews** in `schedule.json` — if any `type: "review"` entry is due today or overdue, run that first
+2. **Check for "low" confidence topics** in `progress.md` that have been covered but not reviewed recently → prioritise
+3. **Otherwise** → take the next uncovered topic from `curriculum.md`
+
+Announce:
+> "Today's session: **[Topic]**
+> Why this now: [1 sentence — spaced repetition / low confidence / next in plan]
+> Estimated time: [X] min. Ready?"
 
 ## Step 3 — Teach
 
-Deliver the lesson following Matt's /teach conventions:
-- Keep it tight — one concept per session
-- Knowledge first (cited sources where possible), then skill practice
-- Use retrieval practice: ask the user to recall or apply, don't just lecture
-- Interactive where possible — questions, mini exercises, scenario-based prompts
+Deliver the lesson using the grilling approach — never lecture without checking understanding:
+- Introduce one concept, then immediately ask the user to apply or explain it back
+- Build complexity only after the previous concept is confirmed understood
+- If user struggles → slow down, rephrase, use an analogy before moving on
+- If user breezes through → compress, skip scaffolding, go deeper faster
 - Save lesson to `~/.claude/interview-prep-agent/tracks/[track]/lessons/[NNN]-[topic].md`
 
-## Step 4 — End of session
+For **review sessions** (`type: "review"`): run a retrieval-only session — ask the user to recall from memory, no re-teaching unless they can't. 20 min max.
+
+## Step 4 — End of session confidence check
 
 Ask:
-> "Session done. Confidence on [topic]: low / medium / high?"
+> "Session done. Confidence on [topic]: **low / medium / high**?"
 
-Record rating in `progress.md`.
+Then use the grilling approach to validate the self-rating:
+- If "high" → ask one hard follow-up question. If they answer well, accept "high". If not, record "medium".
+- If "medium" → ask one application question. If vague, record "low".
+- If "low" → accept, note specific gap they identified.
 
-Then ask:
-> "Did you make any handwritten notes during this session?"
+Record validated rating in `progress.md`.
+
+## Step 5 — Handwritten notes
+
+Ask:
+> "Did you make any handwritten notes?"
 
 If yes:
 > "AirDrop the photo to your Mac and give me the file path."
 
-When path provided — read the image, extract written content, save to:
+Read the image via vision. Extract content verbatim. Save to:
 `~/.claude/interview-prep-agent/notes/[YYYY-MM-DD]-[topic].md`
 
-with structure:
 ```markdown
 ---
 date: YYYY-MM-DD
@@ -57,24 +71,51 @@ session: [lesson id]
 [Extracted handwritten content verbatim]
 
 ## Agent summary
-[Brief summary of what was noted]
+[What was noted, in context of the lesson]
 ```
 
-## Step 5 — Schedule next session
+## Step 6 — Trigger loop replanning
 
-Check `schedule.json` for the next planned session. If none:
+After recording confidence, immediately calculate spaced repetition schedule for this topic:
+
+| Confidence | Next review |
+|---|---|
+| high | +7 days |
+| medium | +3 days |
+| low | next session |
+
+Insert review entry into `schedule.json`:
+```json
+{
+  "date": "[ISO date]",
+  "type": "review",
+  "topic": "[topic]",
+  "track": "[track]",
+  "reason": "spaced repetition — [high/medium/low] confidence"
+}
+```
+
+Then write loop replan signal to `~/.claude/interview-prep-agent/loop-signal.json`:
+```json
+{
+  "trigger": "session_complete",
+  "topic": "[topic]",
+  "confidence": "[low|medium|high]",
+  "timestamp": "[ISO datetime]"
+}
+```
+
+## Step 7 — Schedule next session
+
+Read `schedule.json` for next planned session. If none:
 > "When's your next session? I'll add it to Calendar."
 
-Parse and create Calendar event via osascript (same as onboarding).
+Create Calendar event via osascript with 30-min alert.
 
-## Step 6 — Update state
+## Step 8 — Update state
 
-Update `progress.md` with:
-- Topic covered
-- Confidence rating
-- Date
-- Notes reference if applicable
-- Next recommended topic
+Update `progress.md`:
+- Topic, confidence, date, notes reference, next recommended topic
 
 Update `state.json`:
 ```json

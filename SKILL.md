@@ -20,15 +20,16 @@ State schema:
   "current_track": null,
   "next_session": null,
   "last_lesson": null,
-  "onboarding_step": null
+  "onboarding_step": "cv|positions|time|deadline|exam|analysing|curriculum|scheduling"
 }
 ```
 
 ## Step 2 — Route
 
 - `new` or file missing → run [ONBOARDING](./onboard/SKILL.md)
-- `onboarding` → resume onboarding from `onboarding_step`
+- `onboarding` → resume onboarding from `onboarding_step` (including `exam` step)
 - `active` + args contain "update" → run [UPDATE](./update/SKILL.md)
+- `active` + args contain "loop" → run [LOOP](./loop/SKILL.md) (cron heartbeat)
 - `active` + no args → run [SESSION](./session/SKILL.md)
 - `updating` → resume update
 
