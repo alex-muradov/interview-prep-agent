@@ -49,6 +49,10 @@ Apple Calendar is a read-through **projection** of `schedule.json`, never a sepa
 - **Description:** `Run /interview-prep-agent in Claude Code to start your session.`
 - **Alarm:** one sound alarm, 30 minutes before start (`trigger interval: -30`)
 
+**Invariant:** any change to future sessions in `schedule.json` or `next_session` (reschedule, skip, move, compression, a new review) must be followed by a Calendar reconcile **in the same run** — whether the change happens in onboard, a session, an update, the loop, or an ad-hoc request. Calendar must never lag the schedule.
+
+**Reconcile (full rebuild):** delete every *future* event on `state.calendar_name` whose title starts with `Interview Prep`, then recreate one event per future session in `schedule.json` using the canonical format above. It is idempotent — safe to run after any schedule change, and it dedupes optimistic events. The concrete osascript lives in `loop/SKILL.md` → Calendar Sync.
+
 ### Loop Tick
 A daily autonomous run of the learning loop, triggered by cron at 9am. Observes state, detects conditions, replans silently, reconciles the Calendar Projection, sends one notification. The loop is the agent's autonomy — without it, the agent is a passive planner.
 

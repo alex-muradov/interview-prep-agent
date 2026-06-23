@@ -73,3 +73,4 @@ The [LOOP](./loop/SKILL.md) is the autonomous cron heartbeat. It is **not** rout
 - Always read state first, act second
 - Be concise — the user is here to learn, not to read agent output
 - After every significant action, write updated state back to `~/.claude/interview-prep-agent/state.json`
+- Whenever you change a future session in `schedule.json` or `next_session` (move, skip, reschedule, replan), reconcile the Calendar in the **same run** (CONTEXT.md → Calendar Projection → Reconcile). Calendar must never lag the schedule.
