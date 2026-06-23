@@ -60,19 +60,20 @@ For each condition detected, write changes to:
 
 ## Calendar Sync
 
-`schedule.json` is the single source of truth for sessions; Apple Calendar is a **projection** of it (see ADR-005 and CONTEXT.md → Calendar Projection). When the Replan step above changed `schedule.json`, reconcile Calendar so it matches.
+`schedule.json` is the single source of truth; Apple Calendar is a **projection** of it, with each session's event tracked by its `calendar_uid` (see ADR-007 and CONTEXT.md → Calendar Projection). When the Replan step above changed `schedule.json`, reconcile Calendar by **moving/updating the specific events** — never delete-and-recreate the whole set.
 
-**When to sync:** only if Replan modified `schedule.json` this tick (missed-session reschedule, streak-driven compression/expansion, deadline sprint, etc.). If Replan made no changes, **skip entirely** — do not touch Calendar.
+**When to sync:** only if Replan modified `schedule.json` this tick (missed-session reschedule, streak-driven compression/expansion, deadline sprint, etc.). If Replan made no changes, **skip entirely**.
 
-**How to sync — full rebuild** (idempotent and self-healing: it also dedupes the optimistic events onboard/session created). Substitute `[CALENDAR_NAME]` with `state.calendar_name`.
+Substitute `[CALENDAR_NAME]` with `state.calendar_name` in every snippet below.
 
-1. Delete all *future* agent events. Only events whose title starts with `Interview Prep` are touched — past events and the user's own events are left alone:
+**Step A — per future session in `schedule.json`:**
+
+- If the session is now skipped/removed → delete its event by UID and clear `calendar_uid`:
 ```bash
 osascript << 'EOF'
 tell application "Calendar"
   tell calendar "[CALENDAR_NAME]"
-    set toDelete to (every event whose start date > (current date) and summary starts with "Interview Prep")
-    repeat with e in toDelete
+    repeat with e in (every event whose uid is "[UID]")
       delete e
     end repeat
   end tell
@@ -80,7 +81,33 @@ end tell
 EOF
 ```
 
-2. Recreate one event per *future* session in `schedule.json`, using the canonical event format (CONTEXT.md → Calendar Projection): title `Interview Prep — [Topic]` (reviews: `Interview Prep — Review: [Topic]`), the standard description, and a 30-minute sound alarm. Repeat this per session (substitute the session's date/time, duration, and title):
+- If it has a `calendar_uid` → move/update in place. Returns `missing` if the user deleted the event (then fall through to create):
+```bash
+osascript << 'EOF'
+tell application "Calendar"
+  tell calendar "[CALENDAR_NAME]"
+    set matches to (every event whose uid is "[UID]")
+    if (count of matches) is 0 then
+      return "missing"
+    end if
+    set e to item 1 of matches
+    set d to (current date)
+    set year of d to [YEAR]
+    set month of d to [MONTH]
+    set day of d to [DAY]
+    set hours of d to [HOUR]
+    set minutes of d to [MINUTE]
+    set seconds of d to 0
+    set start date of e to d
+    set end date of e to (d + [DURATION] * minutes)
+    set summary of e to "[TITLE]"
+    return "ok"
+  end tell
+end tell
+EOF
+```
+
+- If it has no `calendar_uid` (or the update returned `missing`) → create the event and **store the returned UID** back onto that session in `schedule.json`. Title `Interview Prep — [Topic]` (reviews: `Interview Prep — Review: [Topic]`):
 ```bash
 osascript << 'EOF'
 tell application "Calendar"
@@ -94,12 +121,29 @@ tell application "Calendar"
     set seconds of d to 0
     set newEvent to make new event with properties {summary:"[TITLE]", start date:d, end date:(d + [DURATION] * minutes), description:"Run /interview-prep-agent in Claude Code to start your session."}
     tell newEvent to make new sound alarm at end with properties {trigger interval:-30}
+    return uid of newEvent
   end tell
 end tell
 EOF
 ```
 
-Record the result in the `## Loop Changes` log and `loop.log` (e.g. `calendar: rebuilt N future events`).
+**Step B — orphan sweep.** List future agent events and delete any whose UID is not referenced by `schedule.json` (clears events left by older versions, including old `Interview Prep W…` titles):
+```bash
+osascript << 'EOF'
+tell application "Calendar"
+  tell calendar "[CALENDAR_NAME]"
+    set out to ""
+    repeat with e in (every event whose start date > (current date) and summary starts with "Interview Prep")
+      set out to out & (uid of e) & linefeed
+    end repeat
+    return out
+  end tell
+end tell
+EOF
+```
+For each returned UID not present as a `calendar_uid` in `schedule.json`, delete it with the by-UID delete snippet above.
+
+Record the result in the `## Loop Changes` log and `loop.log` (e.g. `calendar: moved 1, created 0, swept 4 orphans`).
 
 ## Notify
 

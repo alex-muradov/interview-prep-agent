@@ -28,8 +28,8 @@ Announce:
 > Estimated time: [X] min. Ready?"
 
 **If the user declines or wants to reschedule** (e.g. "not today", "start Thursday instead"):
-1. Update the relevant entry in `schedule.json` and `state.next_session` to the new date/time.
-2. **Reconcile Calendar in this same run** (CONTEXT.md → Calendar Projection → Reconcile): delete future `Interview Prep` events on `state.calendar_name` and recreate them from `schedule.json`. The Calendar must reflect the move immediately — do not wait for the loop.
+1. Update the relevant entry in `schedule.json` and `state.next_session` to the new date/time. If the user is skipping past sessions, mark those entries `status: "skipped"`.
+2. **Reconcile Calendar in this same run by UID** (CONTEXT.md → Calendar Projection → Reconcile, snippets in `loop/SKILL.md` → Calendar Sync): for the moved session, look up its event by `calendar_uid` and update its start/end in place (a move — do **not** create a second event). For any session you marked skipped/removed, delete its event by `calendar_uid` and clear the field. Then run the orphan sweep to clear any stray `Interview Prep` events. Calendar must reflect the change immediately — do not wait for the loop.
 3. Confirm: `"✓ Moved to [new datetime] — Calendar updated. See you then."` and end the run. Do not push the lesson.
 
 ## Step 3 — Teach
@@ -126,7 +126,12 @@ Then write loop replan signal to `~/.claude/interview-prep-agent/loop-signal.jso
 Read `schedule.json` for next planned session. If none:
 > "When's your next session? I'll add it to Calendar."
 
-Write the next session into `schedule.json`, then **reconcile Calendar in this same run** (CONTEXT.md → Calendar Projection → Reconcile): delete future `Interview Prep` events on `state.calendar_name` and recreate one per future session using the canonical event format. The full rebuild keeps Calendar correct even when a previously scheduled session moved, and dedupes automatically. Never rely on the loop alone to apply a schedule change.
+Write the next session into `schedule.json`, then **reconcile Calendar in this same run by UID** (CONTEXT.md → Calendar Projection → Reconcile; snippets in `loop/SKILL.md` → Calendar Sync):
+- If the next session already has a `calendar_uid`, update that event in place.
+- Otherwise create the event using the canonical format, capture the returned `uid of newEvent`, and **store it as `calendar_uid` on that session in `schedule.json`**.
+- Run the orphan sweep to clear any stray `Interview Prep` events.
+
+Never delete-and-recreate the whole set, and never rely on the loop alone to apply a schedule change.
 
 ## Step 8 — Update state
 

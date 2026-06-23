@@ -41,7 +41,7 @@ Review sessions automatically inserted into `schedule.json` after each lesson, b
 - `low` → review next session, then 5 days
 
 ### Calendar Projection
-Apple Calendar is a read-through **projection** of `schedule.json`, never a separate source of truth. Every *future* session in `schedule.json` maps to exactly one Calendar event on the user's chosen calendar. The loop reconciles the projection on every tick that changes the schedule (see ADR-005). Completed/past sessions are left untouched as history.
+Apple Calendar is a read-through **projection** of `schedule.json`, never a separate source of truth. Every *future* session in `schedule.json` maps to exactly one Calendar event, tracked by the event's **UID** stored on the session as `calendar_uid` (see ADR-007). Reconciliation targets that specific event — move/update it in place, never delete-and-recreate. Completed/past sessions are left untouched as history.
 
 **Canonical event format** — used identically by onboard, session, and loop:
 - **Calendar:** `state.calendar_name` — the user's default calendar, resolved once during onboarding, never hardcoded (ADR-002)
@@ -49,9 +49,16 @@ Apple Calendar is a read-through **projection** of `schedule.json`, never a sepa
 - **Description:** `Run /interview-prep-agent in Claude Code to start your session.`
 - **Alarm:** one sound alarm, 30 minutes before start (`trigger interval: -30`)
 
+Each scheduled session entry in `schedule.json` therefore carries an optional `calendar_uid` — the UID of its Calendar event, captured (`uid of newEvent`) when the event is first created.
+
 **Invariant:** any change to future sessions in `schedule.json` or `next_session` (reschedule, skip, move, compression, a new review) must be followed by a Calendar reconcile **in the same run** — whether the change happens in onboard, a session, an update, the loop, or an ad-hoc request. Calendar must never lag the schedule.
 
-**Reconcile (full rebuild):** delete every *future* event on `state.calendar_name` whose title starts with `Interview Prep`, then recreate one event per future session in `schedule.json` using the canonical format above. It is idempotent — safe to run after any schedule change, and it dedupes optimistic events. The concrete osascript lives in `loop/SKILL.md` → Calendar Sync.
+**Reconcile (UID-targeted, per session):** for each *future* session in `schedule.json`:
+- has `calendar_uid` → look the event up by UID and set its start/end/summary in place (a move, not a recreate). If the UID isn't found (user deleted it), create a fresh event and store the new UID.
+- no `calendar_uid` → create the event and store its UID.
+- session now skipped/removed → delete the event by UID and clear `calendar_uid`.
+
+Then **orphan sweep**: delete any future event on `state.calendar_name` whose title starts with `Interview Prep` and whose UID is not referenced by `schedule.json` (clears events left by older versions). The concrete osascript lives in `loop/SKILL.md` → Calendar Sync.
 
 ### Loop Tick
 A daily autonomous run of the learning loop, triggered by cron at 9am. Observes state, detects conditions, replans silently, reconciles the Calendar Projection, sends one notification. The loop is the agent's autonomy — without it, the agent is a passive planner.

@@ -1,7 +1,9 @@
 # ADR-005 — Apple Calendar as a projection of schedule.json
 
 **Date:** 2026-06-23
-**Status:** Accepted
+**Status:** Superseded by [ADR-007](./ADR-007-calendar-events-tracked-by-uid.md)
+
+> **Superseded.** The "projection of `schedule.json`" principle still holds, but the full-rebuild reconciliation described below produced orphaned duplicate events in practice. ADR-007 replaces the mechanism with UID-tracked events (move/update in place + orphan sweep). Read this ADR for context only.
 
 ## Context
 
