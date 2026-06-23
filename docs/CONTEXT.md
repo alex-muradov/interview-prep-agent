@@ -55,6 +55,9 @@ A daily autonomous run of the learning loop, triggered by cron at 9am. Observes 
 ### Loop Signal
 A file (`loop-signal.json`) written by the session skill after each session completes. Contains the session outcome (topic + confidence). Read by the next loop tick to trigger replanning. Cleared after processing.
 
+### Skill Self-update
+The skill is installed as a **git checkout** at `~/.claude/skills/interview-prep-agent`. On every interactive `/interview-prep-agent` run, the orchestrator fast-forwards it to the git remote before routing (see ADR-006). The check is throttled to once per 24h via `last_update_check` in state, skipped silently if the directory is not a git checkout, offline, or has local changes. Updated instructions take effect on the *next* run. The cron loop does not self-update — it stays pinned until the next interactive run.
+
 ---
 
 ## State Machine
@@ -71,7 +74,7 @@ active → active (on each session or loop tick)
 
 ```
 ~/.claude/interview-prep-agent/
-├── state.json           — routing state + onboarding step
+├── state.json           — routing state, onboarding step, last update check
 ├── profile.md           — extracted user background
 ├── exam-baseline.json   — per-cluster baseline from intro exam
 ├── positions.json       — all positions, scored and tiered

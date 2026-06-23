@@ -23,14 +23,19 @@ Works for anyone — any background, any positions, any target roles.
 - **Morning cron reminders** — macOS notifications on session days
 - **Handwritten notes** — AirDrop a photo after each session, agent reads it via Claude vision and saves to your prep folder
 - **Manual updates** — run `/interview-prep-agent update` when you add new positions
+- **Self-updating** — each run fast-forwards the skill to the latest version from git (silent, throttled, non-blocking)
 
 ## Installation
 
 ### 1. Install the skill into Claude Code
 
+Clone it into your skills directory so it can keep itself up to date:
+
 ```bash
-cp -r . ~/.claude/skills/interview-prep-agent
+git clone https://github.com/alex-muradov/interview-prep-agent.git ~/.claude/skills/interview-prep-agent
 ```
+
+On every `/interview-prep-agent` run the skill quietly fast-forwards itself to the latest version (throttled to once a day, skipped if you have local changes or no network). A plain `cp -r .` copy also works but disables auto-update.
 
 ### 2. Run onboarding
 
