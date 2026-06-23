@@ -121,7 +121,7 @@ Then write loop replan signal to `~/.claude/interview-prep-agent/loop-signal.jso
 Read `schedule.json` for next planned session. If none:
 > "When's your next session? I'll add it to Calendar."
 
-Create Calendar event via osascript with 30-min alert, targeting `state.calendar_name` (the user's default calendar resolved during onboarding — never a hardcoded calendar name, per ADR-002).
+Create the Calendar event using the canonical event format (CONTEXT.md → Calendar Projection): on `state.calendar_name`, title `Interview Prep — [Topic]` (or `Interview Prep — Review: [Topic]` for a review), the standard description, and a 30-minute sound alarm. This is an optimistic write — the next loop tick reconciles the full set from `schedule.json` (ADR-005), so don't worry about duplicates.
 
 ## Step 8 — Update state
 

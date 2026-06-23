@@ -40,8 +40,17 @@ Review sessions automatically inserted into `schedule.json` after each lesson, b
 - `medium` → review in 3 days, then 10 days
 - `low` → review next session, then 5 days
 
+### Calendar Projection
+Apple Calendar is a read-through **projection** of `schedule.json`, never a separate source of truth. Every *future* session in `schedule.json` maps to exactly one Calendar event on the user's chosen calendar. The loop reconciles the projection on every tick that changes the schedule (see ADR-005). Completed/past sessions are left untouched as history.
+
+**Canonical event format** — used identically by onboard, session, and loop:
+- **Calendar:** `state.calendar_name` — the user's default calendar, resolved once during onboarding, never hardcoded (ADR-002)
+- **Title:** `Interview Prep — [Topic]` for lessons; `Interview Prep — Review: [Topic]` for reviews. The `Interview Prep` prefix is the matching key for sync.
+- **Description:** `Run /interview-prep-agent in Claude Code to start your session.`
+- **Alarm:** one sound alarm, 30 minutes before start (`trigger interval: -30`)
+
 ### Loop Tick
-A daily autonomous run of the learning loop, triggered by cron at 9am. Observes state, detects conditions, replans silently, sends one notification. The loop is the agent's autonomy — without it, the agent is a passive planner.
+A daily autonomous run of the learning loop, triggered by cron at 9am. Observes state, detects conditions, replans silently, reconciles the Calendar Projection, sends one notification. The loop is the agent's autonomy — without it, the agent is a passive planner.
 
 ### Loop Signal
 A file (`loop-signal.json`) written by the session skill after each session completes. Contains the session outcome (topic + confidence). Read by the next loop tick to trigger replanning. Cleared after processing.

@@ -221,7 +221,7 @@ osascript -e 'tell application "Calendar" to get name of calendars'
 ```
 Save the chosen name to state as `calendar_name` and reuse it for all future events.
 
-Create Calendar event via osascript (substitute `[CALENDAR_NAME]` with `state.calendar_name`):
+Create the Calendar event using the canonical event format (CONTEXT.md → Calendar Projection). Substitute `[CALENDAR_NAME]` with `state.calendar_name`:
 ```bash
 osascript << 'EOF'
 tell application "Calendar"
@@ -230,7 +230,7 @@ tell application "Calendar"
     set hours of sessionDate to [HOUR]
     set minutes of sessionDate to [MINUTE]
     set seconds of sessionDate to 0
-    set newEvent to make new event with properties {summary:"Interview Prep — [TOPIC]", start date:sessionDate, end date:(sessionDate + [DURATION] * minutes), description:"Run /interview-prep-agent in Claude Code to start."}
+    set newEvent to make new event with properties {summary:"Interview Prep — [TOPIC]", start date:sessionDate, end date:(sessionDate + [DURATION] * minutes), description:"Run /interview-prep-agent in Claude Code to start your session."}
     tell newEvent to make new sound alarm at end with properties {trigger interval:-30}
   end tell
 end tell

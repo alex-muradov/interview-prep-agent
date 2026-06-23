@@ -19,7 +19,7 @@ Works for anyone — any background, any positions, any target roles.
 - **Track clustering** — groups positions into industry-standard tracks (e.g. AI Engineering, AI Product Management, TPM)
 - **3 curriculum options** — different pace/depth tradeoffs, you choose
 - **Lesson delivery** — follows [Matt Pocock's /teach conventions](https://github.com/mattpocock/skills) — retrieval practice, zone of proximal development, beautiful HTML lessons
-- **Apple Calendar integration** — schedules sessions via osascript, no OAuth needed
+- **Apple Calendar integration** — schedules sessions via osascript, no OAuth needed; the daily loop keeps Calendar in sync as the plan adapts (events are a projection of your schedule)
 - **Morning cron reminders** — macOS notifications on session days
 - **Handwritten notes** — AirDrop a photo after each session, agent reads it via Claude vision and saves to your prep folder
 - **Manual updates** — run `/interview-prep-agent update` when you add new positions

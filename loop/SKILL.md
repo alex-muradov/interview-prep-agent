@@ -58,6 +58,49 @@ For each condition detected, write changes to:
 - `curriculum.md` — append a `## Loop Changes` section with timestamped log of what changed and why
 - `loop-signal.json` — clear after processing
 
+## Calendar Sync
+
+`schedule.json` is the single source of truth for sessions; Apple Calendar is a **projection** of it (see ADR-005 and CONTEXT.md → Calendar Projection). When the Replan step above changed `schedule.json`, reconcile Calendar so it matches.
+
+**When to sync:** only if Replan modified `schedule.json` this tick (missed-session reschedule, streak-driven compression/expansion, deadline sprint, etc.). If Replan made no changes, **skip entirely** — do not touch Calendar.
+
+**How to sync — full rebuild** (idempotent and self-healing: it also dedupes the optimistic events onboard/session created). Substitute `[CALENDAR_NAME]` with `state.calendar_name`.
+
+1. Delete all *future* agent events. Only events whose title starts with `Interview Prep` are touched — past events and the user's own events are left alone:
+```bash
+osascript << 'EOF'
+tell application "Calendar"
+  tell calendar "[CALENDAR_NAME]"
+    set toDelete to (every event whose start date > (current date) and summary starts with "Interview Prep")
+    repeat with e in toDelete
+      delete e
+    end repeat
+  end tell
+end tell
+EOF
+```
+
+2. Recreate one event per *future* session in `schedule.json`, using the canonical event format (CONTEXT.md → Calendar Projection): title `Interview Prep — [Topic]` (reviews: `Interview Prep — Review: [Topic]`), the standard description, and a 30-minute sound alarm. Repeat this per session (substitute the session's date/time, duration, and title):
+```bash
+osascript << 'EOF'
+tell application "Calendar"
+  tell calendar "[CALENDAR_NAME]"
+    set d to (current date)
+    set year of d to [YEAR]
+    set month of d to [MONTH]
+    set day of d to [DAY]
+    set hours of d to [HOUR]
+    set minutes of d to [MINUTE]
+    set seconds of d to 0
+    set newEvent to make new event with properties {summary:"[TITLE]", start date:d, end date:(d + [DURATION] * minutes), description:"Run /interview-prep-agent in Claude Code to start your session."}
+    tell newEvent to make new sound alarm at end with properties {trigger interval:-30}
+  end tell
+end tell
+EOF
+```
+
+Record the result in the `## Loop Changes` log and `loop.log` (e.g. `calendar: rebuilt N future events`).
+
 ## Notify
 
 Send a single macOS notification summarising today:
